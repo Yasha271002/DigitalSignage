@@ -8,4 +8,5 @@ public partial class AppConfig : ObservableObject
     [ObservableProperty] private string _folderPath = string.Empty;
     [ObservableProperty] private int _defaultImageDuration = 10;
     [ObservableProperty] private int _password;
+    [ObservableProperty] private string _defaultAudioImage = string.Empty;
 }

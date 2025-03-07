@@ -2,7 +2,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Net.Http;
-using System.Threading.Tasks;
 using DigitalSignage.Models;
 using Serilog;
 
@@ -14,6 +13,7 @@ public class YandexDiskService : IYandexDiskService
     private readonly HttpClient _httpClient;
     private readonly ILogger _logger;
     private readonly AppConfig _config;
+    private readonly string _cacheFolder = Path.Combine(Directory.GetCurrentDirectory(), "Download");
 
     public YandexDiskService(ILogger logger, AppConfig config)
     {
@@ -24,12 +24,14 @@ public class YandexDiskService : IYandexDiskService
             ContentSerializer = new NewtonsoftJsonContentSerializer()
         });
         _httpClient = new HttpClient();
+        Directory.CreateDirectory(_cacheFolder);
     }
 
     public async Task<ObservableCollection<MediaItem>> GetMediaItemsAsync()
     {
         var items = new ObservableCollection<MediaItem>();
         await FetchItemsFromFolderAsync(_config.FolderPath, items);
+        await CleanUpCacheAsync(items);
         return items;
     }
 
@@ -51,29 +53,29 @@ public class YandexDiskService : IYandexDiskService
                             case "file":
                             {
                                 var extension = Path.GetExtension(file.Name).ToLower();
-                                var duration = _config.DefaultImageDuration; 
+                                var fileType = GetFileType(extension);
+                                var duration = _config.DefaultImageDuration;
                                 var order = int.MaxValue;
 
-                                var firstUnderscoreIndex = file.Name.IndexOf('_');
-                                if (firstUnderscoreIndex > 0)
+                                var parts = file.Name.Split('_');
+                                if (parts.Length >= 2 && int.TryParse(parts[0], out var parsedOrder))
                                 {
-                                    var orderStr = file.Name[..firstUnderscoreIndex];
-                                    if (int.TryParse(orderStr, out var parsedOrder))
+                                    order = parsedOrder;
+                                    if (fileType == FileType.Image && parts.Length == 2)
                                     {
-                                        order = parsedOrder;
+                                        var durationStr = Path.GetFileNameWithoutExtension(file.Name).Split('_')[1];
+                                        if (int.TryParse(durationStr, out var parsedDuration))
+                                        {
+                                            duration = parsedDuration;
+                                        }
                                     }
-                                }
-
-                                var fileType = GetFileType(extension);
-                                if (fileType == FileType.Image)
-                                {
-                                    var lastUnderscoreIndex = file.Name.LastIndexOf('_');
-                                    if (lastUnderscoreIndex > firstUnderscoreIndex &&
-                                        lastUnderscoreIndex < file.Name.Length - extension.Length - 1)
+                                    else if (fileType == FileType.Image && parts.Length > 2)
                                     {
-                                        var durationStr = file.Name.Substring(lastUnderscoreIndex + 1,
-                                            file.Name.Length - lastUnderscoreIndex - 1 - extension.Length);
-                                        int.TryParse(durationStr, out duration);
+                                        var lastPart = parts[^1].Replace(extension, "");
+                                        if (int.TryParse(lastPart, out var parsedLastDuration))
+                                        {
+                                            duration = parsedLastDuration;
+                                        }
                                     }
                                 }
 
@@ -111,18 +113,45 @@ public class YandexDiskService : IYandexDiskService
     {
         try
         {
+            var cachePath = Path.Combine(_cacheFolder, fileName);
+            if (File.Exists(cachePath))
+            {
+                _logger.Information("Файл {FileName} уже есть в кэше", fileName);
+                return cachePath;
+            }
+
             _logger.Information("Скачивание файла {FileName}", fileName);
-            var tempPath = Path.Combine(Path.GetTempPath(), fileName);
             var downloadLink = await _api.GetDownloadLink($"OAuth {_config.YandexDiskToken}", remotePath);
             var fileBytes = await _httpClient.GetByteArrayAsync(downloadLink.Href);
-            await File.WriteAllBytesAsync(tempPath, fileBytes);
-            _logger.Information("Файл {FileName} успешно скачан", fileName);
-            return tempPath;
+            await File.WriteAllBytesAsync(cachePath, fileBytes);
+            _logger.Information("Файл {FileName} успешно скачан в кэш", fileName);
+            return cachePath;
         }
         catch (Exception ex)
         {
             _logger.Error(ex, "Ошибка скачивания файла {FileName}", fileName);
             throw;
+        }
+    }
+
+    private async Task CleanUpCacheAsync(ObservableCollection<MediaItem> currentItems)
+    {
+        try
+        {
+            var cachedFiles = Directory.GetFiles(_cacheFolder);
+            var currentFileNames = currentItems.Select(i => i.OriginalFileName).ToHashSet();
+
+            foreach (var cachedFile in cachedFiles)
+            {
+                var fileName = Path.GetFileName(cachedFile);
+                if (currentFileNames.Contains(fileName)) continue;
+                _logger.Information("Удаление устаревшего файла из кэша: {FileName}", fileName);
+                File.Delete(cachedFile);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "Ошибка очистки кэша");
         }
     }
 

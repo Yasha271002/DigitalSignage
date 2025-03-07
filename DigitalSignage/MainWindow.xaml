@@ -15,18 +15,6 @@
         <ContentControl Content="{Binding CurrentContent}"
                         HorizontalAlignment="Stretch"
                         VerticalAlignment="Stretch"/>
-        <Image Source="Images/test.png">
-            <Image.Style>
-                <Style TargetType="Image">
-                    <Setter Property="Visibility" Value="Collapsed"/>
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding IsAudio}" Value="True">
-                            <Setter Property="Visibility" Value="Visible"/>
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </Image.Style>
-        </Image>
         <Grid Panel.ZIndex="2"
               Background="#40000000">
             <Grid.Style>
