@@ -22,7 +22,6 @@ public partial class MainWindowViewModel : ObservableObject, IRecipient<QuitPopu
     private DispatcherTimer _timer;
     private int _currentIndex;
     private bool _isUpdating;
-    private readonly string _cacheFolder = Path.Combine(Directory.GetCurrentDirectory(), "Download");
 
     [ObservableProperty] private bool _isOpen;
     [ObservableProperty] private PasswordPopupViewModel _passwordPopupViewModel = new(App.Config.Password.ToString());
@@ -53,10 +52,6 @@ public partial class MainWindowViewModel : ObservableObject, IRecipient<QuitPopu
     {
         await UpdateMediaListAsync();
         if (MediaItems.Any()) await PlayAsync();
-        else
-        {
-            LoadFromCacheIfAvailable();
-        }
     }
 
     private async Task UpdateMediaListAsync(bool backgroundUpdate = false)
@@ -95,80 +90,11 @@ public partial class MainWindowViewModel : ObservableObject, IRecipient<QuitPopu
         catch (Exception ex)
         {
             _logger.Error(ex, "Ошибка обновления списка медиа");
-            if (!backgroundUpdate)
-            {
-                LoadFromCacheIfAvailable();
-            }
         }
         finally
         {
             _isUpdating = false;
         }
-    }
-
-    private void LoadFromCacheIfAvailable()
-    {
-        if (!Directory.Exists(_cacheFolder)) return;
-        var cachedFiles = Directory.GetFiles(_cacheFolder);
-        if (cachedFiles.Length <= 0) return;
-        _logger.Information("Загрузка медиа из кэша, так как интернет недоступен или список пуст");
-        MediaItems.Clear();
-        foreach (var file in cachedFiles)
-        {
-            var fileName = Path.GetFileName(file);
-            var extension = Path.GetExtension(fileName).ToLower();
-            var fileType = GetFileType(extension);
-            var duration = App.Config.DefaultImageDuration;
-            var order = int.MaxValue;
-
-            var parts = fileName.Split('_');
-            if (parts.Length >= 2 && int.TryParse(parts[0], out var parsedOrder))
-            {
-                order = parsedOrder;
-                switch (fileType)
-                {
-                    case FileType.Image when parts.Length == 2:
-                    {
-                        var durationStr = Path.GetFileNameWithoutExtension(fileName).Split('_')[1];
-                        if (int.TryParse(durationStr, out var parsedDuration))
-                        {
-                            duration = parsedDuration;
-                        }
-
-                        break;
-                    }
-                    case FileType.Image when parts.Length > 2:
-                    {
-                        var lastPart = parts[^1].Replace(extension, "");
-                        if (int.TryParse(lastPart, out var parsedLastDuration))
-                        {
-                            duration = parsedLastDuration;
-                        }
-
-                        break;
-                    }
-                    case FileType.Unknown:
-                        break;
-                    case FileType.Video:
-                        break;
-                    case FileType.Audio:
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException();
-                }
-            }
-
-            MediaItems.Add(new MediaItem
-            {
-                Order = order,
-                Path = file,
-                Duration = duration,
-                FileType = fileType,
-                OriginalFileName = fileName
-            });
-        }
-        _currentIndex = 0;
-        _logger.Information("Загружено {Count} элементов из кэша", MediaItems.Count);
     }
 
     private async Task PlayAsync()
@@ -239,15 +165,20 @@ public partial class MainWindowViewModel : ObservableObject, IRecipient<QuitPopu
                     };
                     var mediaElement = (MediaElement)((Grid)newContent).Children[1];
                     SetupMediaElement(mediaElement, item);
+                    mediaElement.MediaEnded -= async (s, e) => await NextItemAsync();
                     mediaElement.MediaEnded += async (s, e) =>
                     {
                         var fadeOutAnimation = new DoubleAnimation
                         {
                             From = 1,
                             To = 0,
-                            Duration = TimeSpan.FromSeconds(1)
+                            Duration = TimeSpan.FromSeconds(0)
                         };
-                        fadeOutAnimation.Completed += async (_, __) => await MoveToNextItem();
+                        fadeOutAnimation.Completed += async (_, __) =>
+                        {
+                            CurrentContent = null;
+                            await PlayNextItemWithAnimation();
+                        };
                         newContent.BeginAnimation(UIElement.OpacityProperty, fadeOutAnimation);
                     };
                 }
@@ -288,6 +219,17 @@ public partial class MainWindowViewModel : ObservableObject, IRecipient<QuitPopu
         }
     }
 
+    private async Task PlayNextItemWithAnimation()
+    {
+        _currentIndex++;
+        if (_currentIndex >= MediaItems.Count)
+        {
+            _currentIndex = 0;
+            _ = Task.Run(() => UpdateMediaListAsync(true));
+        }
+        await PlayCurrentItemWithAnimation();
+    }
+
     private void SetupMediaElement(MediaElement media, MediaItem item)
     {
         media.MediaOpened += (s, e) =>
@@ -308,7 +250,7 @@ public partial class MainWindowViewModel : ObservableObject, IRecipient<QuitPopu
 
     private async Task NextItemAsync()
     {
-        if (CurrentContent != null && !IsAudio) 
+        if (CurrentContent != null && !IsAudio)
         {
             var fadeOutAnimation = new DoubleAnimation
             {
@@ -316,24 +258,17 @@ public partial class MainWindowViewModel : ObservableObject, IRecipient<QuitPopu
                 To = 0,
                 Duration = TimeSpan.FromSeconds(1)
             };
-            fadeOutAnimation.Completed += async (s, e) => await MoveToNextItem();
+            fadeOutAnimation.Completed += async (s, e) =>
+            {
+                CurrentContent = null;
+                await PlayNextItemWithAnimation();
+            };
             CurrentContent.BeginAnimation(UIElement.OpacityProperty, fadeOutAnimation);
         }
         else
         {
-            await MoveToNextItem();
+            await PlayNextItemWithAnimation();
         }
-    }
-
-    private async Task MoveToNextItem()
-    {
-        _currentIndex++;
-        if (_currentIndex >= MediaItems.Count)
-        {
-            _currentIndex = 0;
-            _ = Task.Run(() => UpdateMediaListAsync(true));
-        }
-        await PlayCurrentItemWithAnimation();
     }
 
     [RelayCommand]
@@ -365,12 +300,4 @@ public partial class MainWindowViewModel : ObservableObject, IRecipient<QuitPopu
     {
         IsOpen = false;
     }
-
-    private FileType GetFileType(string extension) => extension switch
-    {
-        ".jpg" or ".jpeg" or ".png" or ".tiff" or ".gif" => FileType.Image,
-        ".avi" or ".mp4" or ".m4v" or ".mkv" or ".mov" or ".mpeg" or ".wmv" => FileType.Video,
-        ".mp3" or ".wav" => FileType.Audio,
-        _ => FileType.Unknown
-    };
 }

@@ -1,7 +1,7 @@
 {
-	"YandexDiskToken": "y0__xD-iMttGNblNSC4_8i6EinVgTxpCVdMYWtIZLUMZejbv3wG",
-	"FolderPath": "Фото",
-	"DefaultImageDuration": 10,
-	"Password": 1234,
-	"DefaultAudioImage": "default_audio.png"
+	"YandexDiskToken": "", //Токен от Яндекс Диска
+	"FolderPath": "Фото", //Родительская папка на Яндекс диске, откуда берем контент
+	"DefaultImageDuration": 10, //Базовое время перелистывания, если его нет в названии
+	"Password": 1234, //Пароль для выхода
+	"DefaultAudioImage": "default_audio.png" //Базовое изображение для аудио, если нет на яндекс диск
 }

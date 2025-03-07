@@ -14,12 +14,12 @@
     <Grid>
         <ContentControl Content="{Binding CurrentContent}"
                         HorizontalAlignment="Stretch"
-                        VerticalAlignment="Stretch"/>
+                        VerticalAlignment="Stretch" />
         <Grid Panel.ZIndex="2"
               Background="#40000000">
             <Grid.Style>
                 <Style TargetType="Grid">
-                    <Setter Property="Opacity" Value="0"/>
+                    <Setter Property="Opacity" Value="0" />
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding IsOpen}"
                                      Value="True">
@@ -30,7 +30,7 @@
                                                          Duration="0:0:0.5">
                                             <DoubleAnimation.EasingFunction>
                                                 <PowerEase Power="2"
-                                                           EasingMode="EaseInOut"/>
+                                                           EasingMode="EaseInOut" />
                                             </DoubleAnimation.EasingFunction>
                                         </DoubleAnimation>
                                     </Storyboard>
@@ -43,7 +43,7 @@
                                                          Duration="0:0:0.5">
                                             <DoubleAnimation.EasingFunction>
                                                 <PowerEase Power="2"
-                                                           EasingMode="EaseInOut"/>
+                                                           EasingMode="EaseInOut" />
                                             </DoubleAnimation.EasingFunction>
                                         </DoubleAnimation>
                                     </Storyboard>
@@ -51,14 +51,14 @@
                             </DataTrigger.ExitActions>
                         </DataTrigger>
                         <Trigger Property="Opacity" Value="0">
-                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Setter Property="Visibility" Value="Collapsed" />
                         </Trigger>
                     </Style.Triggers>
                 </Style>
             </Grid.Style>
-            <ContentControl Content="{Binding PasswordPopupViewModel}"/>
+            <ContentControl Content="{Binding PasswordPopupViewModel}" />
         </Grid>
-        
+
         <Button
             HorizontalAlignment="Left"
             VerticalAlignment="Bottom"
