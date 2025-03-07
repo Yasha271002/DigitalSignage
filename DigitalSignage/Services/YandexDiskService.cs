@@ -169,8 +169,25 @@ namespace DigitalSignage.Services
                 {
                     var fileName = Path.GetFileName(cachedFile);
                     if (currentFileNames.Contains(fileName)) continue;
-                    _logger.Information("Удаление устаревшего файла из кэша: {FileName}", fileName);
-                    File.Delete(cachedFile);
+                    try
+                    {
+                        _logger.Information("Удаление устаревшего файла из кэша: {FileName}", fileName);
+                        File.Delete(cachedFile);
+                    }
+                    catch (IOException ex)
+                    {
+                        _logger.Warning("Не удалось удалить файл {FileName}, так как он занят: {Error}", fileName, ex.Message);
+                        await Task.Delay(500); 
+                        try
+                        {
+                            File.Delete(cachedFile);
+                            _logger.Information("Повторное удаление файла {FileName} успешно", fileName);
+                        }
+                        catch (Exception retryEx)
+                        {
+                            _logger.Error(retryEx, "Повторное удаление файла {FileName} не удалось", fileName);
+                        }
+                    }
                 }
             }
             catch (Exception ex)
@@ -222,6 +239,14 @@ namespace DigitalSignage.Services
 
                             break;
                         }
+                        case FileType.Unknown:
+                            break;
+                        case FileType.Video:
+                            break;
+                        case FileType.Audio:
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException();
                     }
                 }
 

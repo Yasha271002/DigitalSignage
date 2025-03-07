@@ -1,5 +1,5 @@
 {
-	"YandexDiskToken": "", //Токен от Яндекс Диска
+	"YandexDiskToken": "y0__xD-iMttGNblNSC4_8i6EinVgTxpCVdMYWtIZLUMZejbv3wG", //Токен от Яндекс Диска
 	"FolderPath": "Фото", //Родительская папка на Яндекс диске, откуда берем контент
 	"DefaultImageDuration": 10, //Базовое время перелистывания, если его нет в названии
 	"Password": 1234, //Пароль для выхода
