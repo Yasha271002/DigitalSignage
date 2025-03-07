@@ -46,48 +46,51 @@ public class YandexDiskService : IYandexDiskService
                 {
                     try
                     {
-                        if (file.Type == "file")
+                        switch (file.Type)
                         {
-                            var extension = Path.GetExtension(file.Name).ToLower();
-                            var duration = _config.DefaultImageDuration; 
-                            var order = int.MaxValue;
-
-                            var firstUnderscoreIndex = file.Name.IndexOf('_');
-                            if (firstUnderscoreIndex > 0)
+                            case "file":
                             {
-                                var orderStr = file.Name[..firstUnderscoreIndex];
-                                if (int.TryParse(orderStr, out var parsedOrder))
+                                var extension = Path.GetExtension(file.Name).ToLower();
+                                var duration = _config.DefaultImageDuration; 
+                                var order = int.MaxValue;
+
+                                var firstUnderscoreIndex = file.Name.IndexOf('_');
+                                if (firstUnderscoreIndex > 0)
                                 {
-                                    order = parsedOrder;
+                                    var orderStr = file.Name[..firstUnderscoreIndex];
+                                    if (int.TryParse(orderStr, out var parsedOrder))
+                                    {
+                                        order = parsedOrder;
+                                    }
                                 }
-                            }
 
-                            var fileType = GetFileType(extension);
-                            if (fileType == FileType.Image)
-                            {
-                                var lastUnderscoreIndex = file.Name.LastIndexOf('_');
-                                if (lastUnderscoreIndex > firstUnderscoreIndex &&
-                                    lastUnderscoreIndex < file.Name.Length - extension.Length - 1)
+                                var fileType = GetFileType(extension);
+                                if (fileType == FileType.Image)
                                 {
-                                    var durationStr = file.Name.Substring(lastUnderscoreIndex + 1,
-                                        file.Name.Length - lastUnderscoreIndex - 1 - extension.Length);
-                                    int.TryParse(durationStr, out duration);
+                                    var lastUnderscoreIndex = file.Name.LastIndexOf('_');
+                                    if (lastUnderscoreIndex > firstUnderscoreIndex &&
+                                        lastUnderscoreIndex < file.Name.Length - extension.Length - 1)
+                                    {
+                                        var durationStr = file.Name.Substring(lastUnderscoreIndex + 1,
+                                            file.Name.Length - lastUnderscoreIndex - 1 - extension.Length);
+                                        int.TryParse(durationStr, out duration);
+                                    }
                                 }
-                            }
 
-                            var localPath = await DownloadFileAsync(file.Path, file.Name);
-                            items.Add(new MediaItem
-                            {
-                                Order = order,
-                                Path = localPath,
-                                Duration = duration,
-                                FileType = fileType,
-                                OriginalFileName = file.Name
-                            });
-                        }
-                        else if (file.Type == "dir")
-                        {
-                            await FetchItemsFromFolderAsync(file.Path, items);
+                                var localPath = await DownloadFileAsync(file.Path, file.Name);
+                                items.Add(new MediaItem
+                                {
+                                    Order = order,
+                                    Path = localPath,
+                                    Duration = duration,
+                                    FileType = fileType,
+                                    OriginalFileName = file.Name
+                                });
+                                break;
+                            }
+                            case "dir":
+                                await FetchItemsFromFolderAsync(file.Path, items);
+                                break;
                         }
                     }
                     catch (Exception ex)

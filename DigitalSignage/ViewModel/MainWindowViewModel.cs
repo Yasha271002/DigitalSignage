@@ -22,7 +22,7 @@ public partial class MainWindowViewModel : ObservableObject, IRecipient<QuitPopu
     private int _currentIndex;
 
     [ObservableProperty] private bool _isOpen;
-    [ObservableProperty] private PasswordPopupViewModel _passwordPopupViewModel = new PasswordPopupViewModel(App.Config.Password.ToString());
+    [ObservableProperty] private PasswordPopupViewModel _passwordPopupViewModel = new(App.Config.Password.ToString());
 
     private readonly DispatcherTimer _popupTimer = new(); 
     private int _sec;
