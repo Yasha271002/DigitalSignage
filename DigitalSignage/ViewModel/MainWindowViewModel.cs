@@ -106,36 +106,40 @@ public partial class MainWindowViewModel : ObservableObject, IRecipient<QuitPopu
     {
         if (CurrentContent != null)
         {
-            switch (CurrentContent)
+            await Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                case Image gifImage when ImageBehavior.GetAnimatedSource(gifImage) != null:
-                    ImageBehavior.SetAnimatedSource(gifImage, null);
-                    break;
-                case Grid grid:
+                switch (CurrentContent)
                 {
-                    foreach (var child in grid.Children)
+                    case Image gifImage when ImageBehavior.GetAnimatedSource(gifImage) != null:
+                        ImageBehavior.SetAnimatedSource(gifImage, null);
+                        break;
+                    case Grid grid:
                     {
-                        switch (child)
+                        foreach (var child in grid.Children)
                         {
-                            case Image childImage when ImageBehavior.GetAnimatedSource(childImage) != null:
-                                ImageBehavior.SetAnimatedSource(childImage, null);
-                                break;
-                            case MediaElement mediaElement:
-                                mediaElement.Stop();
-                                mediaElement.Source = null;
-                                break;
+                            switch (child)
+                            {
+                                case Image childImage when ImageBehavior.GetAnimatedSource(childImage) != null:
+                                    ImageBehavior.SetAnimatedSource(childImage, null);
+                                    break;
+                                case MediaElement mediaElement:
+                                    mediaElement.Stop();
+                                    mediaElement.Source = null;
+                                    break;
+                            }
                         }
-                    }
 
-                    break;
+                        break;
+                    }
+                    case MediaElement media:
+                        media.Stop();
+                        media.Source = null;
+                        break;
                 }
-                case MediaElement media:
-                    media.Stop();
-                    media.Source = null;
-                    break;
-            }
-            CurrentContent = null;
-            await Task.Delay(100);
+
+                CurrentContent = null;
+            });
+            await Task.Delay(100); 
         }
     }
 
