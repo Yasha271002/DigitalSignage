@@ -193,11 +193,12 @@ public partial class MainWindowViewModel : ObservableObject, IRecipient<QuitPopu
                 newContent = new MediaElement
                 {
                     Source = new Uri(item.Path),
-                    LoadedBehavior = MediaState.Play,
+                    LoadedBehavior = MediaState.Manual,
                     Stretch = Stretch.Uniform,
                     Opacity = 0
                 };
                 SetupMediaElement((MediaElement)newContent, item);
+                ((MediaElement)newContent).Play();
                 break;
             case FileType.Audio:
                 IsAudio = true;
@@ -239,12 +240,13 @@ public partial class MainWindowViewModel : ObservableObject, IRecipient<QuitPopu
                     var mediaElement = new MediaElement
                     {
                         Source = new Uri(item.Path),
-                        LoadedBehavior = MediaState.Play
+                        LoadedBehavior = MediaState.Manual
                     };
                     grid.Children.Add(mediaElement);
                     newContent = grid;
 
                     SetupMediaElement(mediaElement, item);
+                    mediaElement.Play();
                     mediaElement.MediaEnded -= async (s, e) => await NextItemAsync();
                     //mediaElement.MediaEnded += async (s, e) =>
                     //{
@@ -267,11 +269,12 @@ public partial class MainWindowViewModel : ObservableObject, IRecipient<QuitPopu
                     newContent = new MediaElement
                     {
                         Source = new Uri(item.Path),
-                        LoadedBehavior = MediaState.Play,
+                        LoadedBehavior = MediaState.Manual,
                         Stretch = Stretch.Uniform,
                         Opacity = 0
                     };
                     SetupMediaElement((MediaElement)newContent, item);
+                    ((MediaElement)newContent).Play();
                 }
                 break;
             case FileType.Unknown:
