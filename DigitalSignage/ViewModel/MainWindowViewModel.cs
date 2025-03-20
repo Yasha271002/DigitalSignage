@@ -9,6 +9,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.Messaging;
 using DigitalSignage.Models.Message;
@@ -138,6 +139,7 @@ public partial class MainWindowViewModel : ObservableObject, IRecipient<QuitPopu
                 }
 
                 CurrentContent = null;
+                _logger.Information("Текущий контент очищен");
             });
             await Task.Delay(100); 
         }
@@ -157,119 +159,48 @@ public partial class MainWindowViewModel : ObservableObject, IRecipient<QuitPopu
         _logger.Information("Воспроизведение элемента {Index}: {Path}", _currentIndex, item.Path);
 
         UIElement newContent = null;
-        switch (item.FileType)
+        try
         {
-            case FileType.Image:
-                var baseName = Path.GetFileNameWithoutExtension(item.OriginalFileName);
-                if (MediaItems.Any(i => i.FileType == FileType.Audio &&
-                                        Path.GetFileNameWithoutExtension(i.OriginalFileName) == baseName))
-                {
-                    _logger.Information("Изображение {FileName} пропущено, так как оно связано с аудио", item.OriginalFileName);
-                    await NextItemAsync(); 
-                    return;
-                }
-                if (Path.GetExtension(item.Path).ToLower() == ".gif")
-                {
-                    var gifImage = new Image
+            switch (item.FileType)
+            {
+                case FileType.Image:
+                    var baseName = Path.GetFileNameWithoutExtension(item.OriginalFileName);
+                    if (MediaItems.Any(i => i.FileType == FileType.Audio &&
+                                            Path.GetFileNameWithoutExtension(i.OriginalFileName) == baseName))
                     {
-                        Stretch = Stretch.Uniform,
-                        Opacity = 0
-                    };
-                    var bitmap = new System.Windows.Media.Imaging.BitmapImage(new Uri(item.Path));
-                    ImageBehavior.SetAnimatedSource(gifImage, bitmap);
-                    ImageBehavior.SetAutoStart(gifImage, true);
-                    ImageBehavior.SetRepeatBehavior(gifImage, RepeatBehavior.Forever); 
-                    newContent = gifImage;
-                    _timer.Interval = TimeSpan.FromSeconds(item.Duration);
-                }
-                else
-                {
-                    newContent = new Image
-                    {
-                        Source = new System.Windows.Media.Imaging.BitmapImage(new Uri(item.Path)),
-                        Stretch = Stretch.Uniform,
-                        Opacity = 0
-                    };
-                    _timer.Interval = TimeSpan.FromSeconds(item.Duration);
-                }
-                break;
-            case FileType.Video:
-                newContent = new MediaElement
-                {
-                    Source = new Uri(item.Path),
-                    LoadedBehavior = MediaState.Manual,
-                    Stretch = Stretch.Uniform,
-                    Opacity = 0
-                };
-                SetupMediaElement((MediaElement)newContent, item);
-                ((MediaElement)newContent).Play();
-                break;
-            case FileType.Audio:
-                IsAudio = true;
-                var basePath = Path.Combine(Path.GetDirectoryName(item.Path), Path.GetFileNameWithoutExtension(item.OriginalFileName));
-                string[] extensions = [".gif", ".png", ".jpg", ".jpeg", ".tiff"];
-                var finalImagePath = extensions.Select(ext => basePath + ext).FirstOrDefault(potentialPath => File.Exists(potentialPath));
-
-                if (finalImagePath == null)
-                {
-                    finalImagePath = Path.Combine(Directory.GetCurrentDirectory(), App.Config.DefaultAudioImage);
-                    if (!File.Exists(finalImagePath))
-                    {
-                        _logger.Warning("Стандартное изображение {DefaultImage} не найдено", App.Config.DefaultAudioImage);
-                        finalImagePath = null;
+                        _logger.Information("Изображение {FileName} пропущено, так как оно связано с аудио",
+                            item.OriginalFileName);
+                        await NextItemAsync();
+                        return;
                     }
-                }
 
-                if (finalImagePath != null)
-                {
-                    var grid = new Grid { Opacity = 0 };
-                    if (Path.GetExtension(finalImagePath).ToLower() == ".gif")
+                    if (Path.GetExtension(item.Path).ToLower() == ".gif")
                     {
-                        var gifImage = new Image { Stretch = Stretch.Uniform };
-                        var bitmap = new System.Windows.Media.Imaging.BitmapImage(new Uri(finalImagePath));
+                        var gifImage = new Image
+                        {
+                            Stretch = Stretch.Uniform,
+                            Opacity = 0
+                        };
+                        var bitmap = new BitmapImage(new Uri(item.Path));
                         ImageBehavior.SetAnimatedSource(gifImage, bitmap);
                         ImageBehavior.SetAutoStart(gifImage, true);
                         ImageBehavior.SetRepeatBehavior(gifImage, RepeatBehavior.Forever);
-                        grid.Children.Add(gifImage);
+                        newContent = gifImage;
+                        _timer.Interval = TimeSpan.FromSeconds(item.Duration);
                     }
                     else
                     {
-                        grid.Children.Add(new Image
+                        newContent = new Image
                         {
-                            Source = new System.Windows.Media.Imaging.BitmapImage(new Uri(finalImagePath)),
-                            Stretch = Stretch.Uniform
-                        });
+                            Source = new BitmapImage(new Uri(item.Path)),
+                            Stretch = Stretch.Uniform,
+                            Opacity = 0
+                        };
+                        _timer.Interval = TimeSpan.FromSeconds(item.Duration);
                     }
 
-                    var mediaElement = new MediaElement
-                    {
-                        Source = new Uri(item.Path),
-                        LoadedBehavior = MediaState.Manual
-                    };
-                    grid.Children.Add(mediaElement);
-                    newContent = grid;
-
-                    SetupMediaElement(mediaElement, item);
-                    mediaElement.Play();
-                    mediaElement.MediaEnded -= async (s, e) => await NextItemAsync();
-                    //mediaElement.MediaEnded += async (s, e) =>
-                    //{
-                    //    var fadeOutAnimation = new DoubleAnimation
-                    //    {
-                    //        From = 1,
-                    //        To = 0,
-                    //        Duration = TimeSpan.FromSeconds(1)
-                    //    };
-                    //    fadeOutAnimation.Completed += async (_, __) =>
-                    //    {
-                    //        CurrentContent = null;
-                    //        await PlayNextItemWithAnimation();
-                    //    };
-                    //    newContent.BeginAnimation(UIElement.OpacityProperty, fadeOutAnimation);
-                    //};
-                }
-                else
-                {
+                    break;
+                case FileType.Video:
                     newContent = new MediaElement
                     {
                         Source = new Uri(item.Path),
@@ -279,30 +210,115 @@ public partial class MainWindowViewModel : ObservableObject, IRecipient<QuitPopu
                     };
                     SetupMediaElement((MediaElement)newContent, item);
                     ((MediaElement)newContent).Play();
-                }
-                break;
-            case FileType.Unknown:
-                await NextItemAsync();
-                return;
-            default:
-                throw new ArgumentOutOfRangeException();
-        }
+                    break;
+                case FileType.Audio:
+                    IsAudio = true;
+                    var basePath = Path.Combine(Path.GetDirectoryName(item.Path),
+                        Path.GetFileNameWithoutExtension(item.OriginalFileName));
+                    string[] extensions = [".gif", ".png", ".jpg", ".jpeg", ".tiff"];
+                    var finalImagePath = extensions.Select(ext => basePath + ext)
+                        .FirstOrDefault(potentialPath => File.Exists(potentialPath));
 
-        if (newContent != null)
-        {
-            CurrentContent = newContent;
-            var fadeInAnimation = new DoubleAnimation
-            {
-                From = 0,
-                To = 1,
-                Duration = TimeSpan.FromSeconds(1)
-            };
-            newContent.BeginAnimation(UIElement.OpacityProperty, fadeInAnimation);
+                    if (finalImagePath == null)
+                    {
+                        finalImagePath = Path.Combine(Directory.GetCurrentDirectory(), App.Config.DefaultAudioImage);
+                        if (!File.Exists(finalImagePath))
+                        {
+                            _logger.Warning("Стандартное изображение {DefaultImage} не найдено",
+                                App.Config.DefaultAudioImage);
+                            finalImagePath = null;
+                        }
+                    }
 
-            if (item.FileType == FileType.Image)
-            {
-                _timer.Start();
+                    if (finalImagePath != null)
+                    {
+                        var grid = new Grid { Opacity = 0 };
+                        if (Path.GetExtension(finalImagePath).ToLower() == ".gif")
+                        {
+                            var gifImage = new Image { Stretch = Stretch.Uniform };
+                            var bitmap = new BitmapImage(new Uri(finalImagePath));
+                            ImageBehavior.SetAnimatedSource(gifImage, bitmap);
+                            ImageBehavior.SetAutoStart(gifImage, true);
+                            ImageBehavior.SetRepeatBehavior(gifImage, RepeatBehavior.Forever);
+                            grid.Children.Add(gifImage);
+                        }
+                        else
+                        {
+                            grid.Children.Add(new Image
+                            {
+                                Source = new BitmapImage(new Uri(finalImagePath)),
+                                Stretch = Stretch.Uniform
+                            });
+                        }
+
+                        var mediaElement = new MediaElement
+                        {
+                            Source = new Uri(item.Path),
+                            LoadedBehavior = MediaState.Manual
+                        };
+                        grid.Children.Add(mediaElement);
+                        newContent = grid;
+
+                        SetupMediaElement(mediaElement, item);
+                        mediaElement.Play();
+                        mediaElement.MediaEnded -= async (s, e) => await NextItemAsync();
+                        //mediaElement.MediaEnded += async (s, e) =>
+                        //{
+                        //    var fadeOutAnimation = new DoubleAnimation
+                        //    {
+                        //        From = 1,
+                        //        To = 0,
+                        //        Duration = TimeSpan.FromSeconds(1)
+                        //    };
+                        //    fadeOutAnimation.Completed += async (_, __) =>
+                        //    {
+                        //        CurrentContent = null;
+                        //        await PlayNextItemWithAnimation();
+                        //    };
+                        //    newContent.BeginAnimation(UIElement.OpacityProperty, fadeOutAnimation);
+                        //};
+                    }
+                    else
+                    {
+                        newContent = new MediaElement
+                        {
+                            Source = new Uri(item.Path),
+                            LoadedBehavior = MediaState.Manual,
+                            Stretch = Stretch.Uniform,
+                            Opacity = 0
+                        };
+                        SetupMediaElement((MediaElement)newContent, item);
+                        ((MediaElement)newContent).Play();
+                    }
+
+                    break;
+                case FileType.Unknown:
+                    await NextItemAsync();
+                    return;
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
+            if (newContent != null)
+            {
+                CurrentContent = newContent;
+                var fadeInAnimation = new DoubleAnimation
+                {
+                    From = 0,
+                    To = 1,
+                    Duration = TimeSpan.FromSeconds(1)
+                };
+                newContent.BeginAnimation(UIElement.OpacityProperty, fadeInAnimation);
+
+                if (item.FileType == FileType.Image)
+                {
+                    _timer.Start();
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            _logger.Error(e, "Ошибка при воспроизведении элемента {Index}: {Path}", _currentIndex, item.Path);
+            await PlayNextItemWithAnimation();
         }
     }
 
@@ -312,8 +328,21 @@ public partial class MainWindowViewModel : ObservableObject, IRecipient<QuitPopu
         if (_currentIndex >= MediaItems.Count)
         {
             _currentIndex = 0;
-            _ = Task.Run(() => UpdateMediaListAsync(true));
+            _logger.Information("Цикл воспроизведения завершен, возврат к началу");
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await UpdateMediaListAsync(true);
+                    _logger.Information("Фоновое обновление списка завершено");
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error(ex, "Ошибка при фоновом обновлении списка");
+                }
+            });
         }
+        _logger.Information("Переход к следующему элементу, индекс: {Index}", _currentIndex);
         await PlayCurrentItemWithAnimation();
     }
 
